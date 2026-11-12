@@ -1,0 +1,6 @@
+CREATE TABLE IF NOT EXISTS payments (
+    order_id VARCHAR(64) PRIMARY KEY,
+    amount BIGINT NOT NULL CHECK (amount > 0),
+    status VARCHAR(12) NOT NULL CHECK (status IN ('SUCCEEDED', 'FAILED')),
+    processed_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6)
+);

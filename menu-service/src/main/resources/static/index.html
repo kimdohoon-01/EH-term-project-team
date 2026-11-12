@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>카페 픽업 · 메뉴 서비스</title>
+    <link rel="stylesheet" href="styles.css">
+    <script defer src="app.js"></script>
+</head>
+<body>
+<main>
+    <header><p>카페 픽업</p><h1>메뉴와 재고 관리</h1></header>
+    <p id="message" role="status" hidden></p>
+    <section>
+        <div class="section-heading"><h2>메뉴 목록</h2><button id="new-menu" type="button">새 메뉴</button></div>
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th scope="col">ID</th><th scope="col">메뉴</th><th scope="col">가격</th><th scope="col">재고</th><th scope="col">판매 상태</th><th scope="col">관리</th></tr></thead>
+                <tbody id="menus"></tbody>
+            </table>
+        </div>
+    </section>
+    <div class="grid">
+        <section>
+            <h2 id="editor-title">메뉴 등록</h2>
+            <form id="menu-form">
+                <label>메뉴 이름<input name="name" maxlength="80" required></label>
+                <label>가격 (원)<input name="price" type="number" min="1" max="1000000" required></label>
+                <label id="initial-stock">초기 재고<input name="stock" type="number" min="0" max="1000000" value="0" required></label>
+                <label id="active-control" hidden>판매 상태<select name="active"><option value="true">판매 중</option><option value="false">판매 중지</option></select></label>
+                <button type="submit">저장</button>
+            </form>
+        </section>
+        <section>
+            <h2>재고 조정</h2>
+            <form id="adjust-form">
+                <label>메뉴 ID<input name="menuId" type="number" min="1" required></label>
+                <label>변경 수량<input name="delta" type="number" min="-1000000" max="1000000" placeholder="입고 +10, 폐기 -2" required></label>
+                <button type="submit">재고 반영</button>
+            </form>
+        </section>
+    </div>
+    <section>
+        <h2>주문 재고 테스트</h2>
+        <form id="stock-form">
+            <div class="grid fields">
+                <label>주문 ID<input name="orderId" pattern="[a-z0-9_\-]{1,64}" placeholder="demo-001" required></label>
+                <label>메뉴 ID<input name="menuId" type="number" min="1" required></label>
+                <label>주문 수량<input name="quantity" type="number" min="1" max="10000" value="1" required></label>
+            </div>
+            <div class="actions">
+                <button type="submit" value="reserve">재고 차감</button>
+                <button type="submit" value="get" formnovalidate>차감 기록 조회</button>
+                <button type="submit" value="release" formnovalidate>재고 복구</button>
+            </div>
+        </form>
+        <p id="reservation" role="status" hidden></p>
+    </section>
+</main>
+</body>
+</html>

@@ -1,0 +1,58 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: menu-service
+spec:
+  selector:
+    app: menu-service
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: menu-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: menu-service
+  template:
+    metadata:
+      labels:
+        app: menu-service
+    spec:
+      containers:
+        - name: menu-service
+          image: menu-service:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: DB_URL
+              value: jdbc:mysql://menu-db:3306/cafe_menu
+            - name: DB_USER
+              value: menu_app
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: menu-db-credentials
+                  key: password
+          startupProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: 5
+            failureThreshold: 36
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
