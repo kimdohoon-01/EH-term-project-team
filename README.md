@@ -50,6 +50,17 @@ Docker Desktop에서 배포가 끝나면 `LoadBalancer` 게이트웨이가 PC의
 kubectl --context docker-desktop -n cafe-pickup rollout restart deployment/menu-service deployment/payment-service
 ```
 
+## HeidiSQL에서 DB 확인
+
+이 PC의 HeidiSQL에는 `Cafe Pickup - Menu`(`127.0.0.1:13306`, `cafe_menu`)와 `Cafe Pickup - Payment`(`127.0.0.1:13307`, `cafe_payment`) 세션을 등록했다. 두 세션은 각 MySQL의 3306에 연결된다.
+
+Docker Desktop을 재시작해 연결이 끊겼다면, 아래 명령을 각기 다른 PowerShell 창에서 실행한 다음 HeidiSQL에서 저장한 세션을 다시 연다.
+
+```powershell
+kubectl --context docker-desktop -n cafe-pickup port-forward --address 127.0.0.1 svc/menu-db 13306:3306
+kubectl --context docker-desktop -n cafe-pickup port-forward --address 127.0.0.1 svc/payment-db 13307:3306
+```
+
 ## 오더 서비스 연동
 
 오더 서비스가 재고 차감과 결제 호출을 순서대로 진행한다. 결제 상태가 `FAILED`이면 오더 서비스가 같은 주문 ID로 복구를 요청한다. 아래 URL은 같은 네임스페이스의 Pod에서 호출하는 기준이다. `orderId`는 소문자 영문·숫자·밑줄·하이픈 1~64자다.
