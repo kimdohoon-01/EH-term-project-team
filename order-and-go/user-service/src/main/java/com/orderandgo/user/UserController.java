@@ -25,6 +25,12 @@ public class UserController {
 
     @PostMapping("/register")
     public AuthResponse register(@Valid @RequestBody RegisterRequest r) {
+        if(r.password()==null || !r.password().matches("[!-~]{8,72}") || !r.password().matches(".*[A-Za-z].*")
+            || !r.password().matches(".*[0-9].*") || !r.password().matches(".*[^A-Za-z0-9].*"))
+            throw new ApiException(400,"PASSWORD_RULE","비밀번호는 공백 없이 영문·숫자·특수문자를 포함한 8~72자로 입력해 주세요.");
+        if(r.address()==null || r.address().strip().length()<5 || r.address().strip().length()>200
+            || (r.addressDetail()!=null && r.addressDetail().length()>100))
+            throw new ApiException(400,"ADDRESS_RULE","기본주소는 5~200자, 상세주소는 100자 이하로 입력해 주세요.");
         if (r.password().getBytes(StandardCharsets.UTF_8).length>72 || r.name().isBlank())
             throw new ApiException(400,"INVALID_INPUT","비밀번호는 UTF-8 기준 72바이트 이하로 입력해 주세요.");
         String id=UUID.randomUUID().toString(), email=r.email().strip().toLowerCase(Locale.ROOT);
@@ -32,6 +38,8 @@ public class UserController {
         try {
             return tx.execute(s -> {
                 db.update("INSERT INTO app_users(id,email,name,password_hash) VALUES(?,?,?,?)",id,email,r.name().strip(),hash);
+                db.update("INSERT INTO user_addresses(user_id,address,address_detail) VALUES(?,?,?)",
+                    id,r.address().strip(),r.addressDetail()==null?"":r.addressDetail().strip());
                 return session(new UserView(id,email,r.name().strip()));
             });
         } catch (DuplicateKeyException e) {throw new ApiException(409,"EMAIL_EXISTS","이미 가입된 이메일입니다.");}

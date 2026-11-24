@@ -19,16 +19,30 @@ class UserControllerTest {
         users=new UserController(db,new TransactionTemplate(new DataSourceTransactionManager(ds)));
     }
     @Test void passwordAndTokensAreStoredAsHashesAndLogoutRevokesSession(){
-        var auth=users.register(new RegisterRequest("DoHoon@example.com","password123","도훈"));
+        var auth=users.register(new RegisterRequest("DoHoon@example.com","Password123!","도훈","서울시 중구 세종대로 110","101호"));
         assertEquals("dohoon@example.com",auth.user().email());assertEquals(auth.user(),users.me("Bearer "+auth.accessToken()));
-        assertNotEquals("password123",db.queryForObject("SELECT password_hash FROM app_users",String.class));
+        assertEquals("서울시 중구 세종대로 110",db.queryForObject("SELECT address FROM user_addresses",String.class));
+        assertEquals("101호",db.queryForObject("SELECT address_detail FROM user_addresses",String.class));
+        assertNotEquals("Password123!",db.queryForObject("SELECT password_hash FROM app_users",String.class));
         assertNotEquals(auth.accessToken(),db.queryForObject("SELECT token_hash FROM sessions",String.class));
         users.logout("Bearer "+auth.accessToken());assertThrows(ApiException.class,()->users.me("Bearer "+auth.accessToken()));
     }
+    @Test void rejectsWeakPasswordsAndInvalidAddressesWithoutCreatingUser(){
+        for(String password:List.of("short1!","password123","PASSWORD!!!","12345678!","Pass word1!","비밀번호123!"))
+            assertThrows(ApiException.class,()->users.register(new RegisterRequest("a@example.com",password,"도훈","서울시 중구 세종대로 110",null)));
+        for(String address:Arrays.asList(null," ","서울","가".repeat(201)))
+            assertThrows(ApiException.class,()->users.register(new RegisterRequest("a@example.com","Password123!","도훈",address,null)));
+        assertEquals(0,db.queryForObject("SELECT COUNT(*) FROM app_users",Integer.class));
+    }
+    @Test void oldMemberCanLoginWithoutAddressOrNewPasswordRule(){
+        String hash=new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder().encode("password123");
+        db.update("INSERT INTO app_users VALUES(?,?,?,?)","old","old@example.com","기존회원",hash);
+        assertNotNull(users.login(new LoginRequest("old@example.com","password123")).accessToken());
+    }
     @Test void rejectsDuplicateEmailAndWrongPassword(){
-        users.register(new RegisterRequest("hello@example.com","password123","도훈"));
-        assertThrows(ApiException.class,()->users.register(new RegisterRequest("HELLO@example.com","password123","규아")));
+        users.register(new RegisterRequest("hello@example.com","Password123!","도훈","서울시 중구 세종대로 110","101호"));
+        assertThrows(ApiException.class,()->users.register(new RegisterRequest("HELLO@example.com","Password123!","규아","서울시 중구 세종대로 110",null)));
         assertThrows(ApiException.class,()->users.login(new LoginRequest("hello@example.com","wrong")));
-        assertNotNull(users.login(new LoginRequest("HELLO@example.com","password123")).accessToken());
+        assertNotNull(users.login(new LoginRequest("HELLO@example.com","Password123!")).accessToken());
     }
 }

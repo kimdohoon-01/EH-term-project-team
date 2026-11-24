@@ -1,0 +1,79 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: payment-db-data
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: payment-db
+spec:
+  selector:
+    app: payment-db
+  ports:
+    - name: mysql
+      port: 3306
+      targetPort: mysql
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-db
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: payment-db
+  template:
+    metadata:
+      labels:
+        app: payment-db
+    spec:
+      containers:
+        - name: mysql
+          image: mysql:8.4
+          ports:
+            - name: mysql
+              containerPort: 3306
+          env:
+            - name: MYSQL_DATABASE
+              value: cafe_payment
+            - name: MYSQL_USER
+              value: payment_app
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: payment-db-credentials
+                  key: password
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: payment-db-credentials
+                  key: root-password
+          startupProbe:
+            tcpSocket:
+              port: mysql
+            periodSeconds: 5
+            failureThreshold: 36
+          readinessProbe:
+            tcpSocket:
+              port: mysql
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+          volumeMounts:
+            - name: mysql-data
+              mountPath: /var/lib/mysql
+      volumes:
+        - name: mysql-data
+          persistentVolumeClaim:
+            claimName: payment-db-data

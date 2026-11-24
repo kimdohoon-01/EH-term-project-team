@@ -1,4 +1,4 @@
-param([switch]$SkipBuild,[switch]$BuildOnly,[ValidateSet('local','team')][string]$Profile='team',[ValidateSet('auto','h2','mysql')][string]$Database='auto')
+﻿param([switch]$SkipBuild,[switch]$BuildOnly,[ValidateSet('local','team')][string]$Profile='local',[ValidateSet('auto','h2','mysql')][string]$Database='auto',[switch]$SeedDemo)
 $ErrorActionPreference='Stop'
 $projectRoot=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 Set-Location -LiteralPath $projectRoot
@@ -10,17 +10,24 @@ $javaExe=Join-Path $env:JAVA_HOME 'bin\java.exe'
 $env:Path="$env:JAVA_HOME\bin;$env:Path"
 if (!$env:MAVEN_USER_HOME) { $env:MAVEN_USER_HOME=Join-Path $projectRoot '.maven' }
 $mavenRepository=if($env:ORDERANDGO_MAVEN_REPO){$env:ORDERANDGO_MAVEN_REPO}else{Join-Path $projectRoot '.maven\repository'}
-function Get-JarPath($name){return "$name\target\$name-0.1.0.jar"}
-function Get-HealthPath($name){return '/actuator/health'}
+function Get-JarPath($name){
+    if($name -in @('menu-service','payment-service')){return "..\$name\target\$name.jar"}
+    return "$name\target\$name-0.1.0.jar"
+}
+function Get-HealthPath($name){
+    if($name -eq 'menu-service'){return '/api/menus'}
+    if($name -eq 'payment-service'){return '/api/payments'}
+    return '/actuator/health'
+}
 $modules=[ordered]@{'user-service'=8081;'notification-service'=8083;'order-service'=8080}
-
+if($Profile -eq 'local') { $modules['menu-service']=8082; $modules['payment-service']=8084 }
 foreach($port in $(if(!$BuildOnly){$modules.Values})) {
     if (Get-NetTCPConnection -State Listen -LocalPort $port -ErrorAction SilentlyContinue) {
         throw "Port $port is already in use. Stop this project with stop-local.cmd before rebuilding or restarting."
     }
 }
 if (!$SkipBuild) {
-    & (Join-Path $projectRoot 'mvnw.cmd') -B --no-transfer-progress "-Dmaven.repo.local=$mavenRepository" package
+    & (Join-Path $projectRoot '..\mvnw.cmd') -f (Join-Path $projectRoot '..\pom.xml') -P integration -B --no-transfer-progress "-Dmaven.repo.local=$mavenRepository" package
     if ($LASTEXITCODE -ne 0) { throw 'Build or tests failed. Review the Maven output.' }
 }
 if ($BuildOnly) { return }
@@ -31,13 +38,13 @@ $mysqlConfig=$null
 if($Database -eq 'mysql'){
     if(!(Test-Path -LiteralPath $mysqlConfigPath)){throw 'Run setup-mysql.cmd once before using MySQL.'}
     $mysqlConfig=Get-Content -LiteralPath $mysqlConfigPath -Raw|ConvertFrom-Json
-    if($mysqlConfig.schemaVersion -ne 2){throw 'Run setup-mysql.cmd -Upgrade to configure the three service databases.'}; $activeProfiles="$Profile,mysql"
+    if($mysqlConfig.schemaVersion -ne 3){throw 'Run setup-mysql.cmd -Upgrade to add the registration address table.'}; $activeProfiles="$Profile,mysql"
 }
 foreach($entry in $modules.GetEnumerator()) {
     if (Get-NetTCPConnection -State Listen -LocalPort $entry.Value -ErrorAction SilentlyContinue) {
         throw "Port $($entry.Value) is already in use. Run stop-local.cmd if this project is already running."
     }
-    $jar=Join-Path $projectRoot (Get-JarPath $entry.Key)
+    $jar=[IO.Path]::GetFullPath((Join-Path $projectRoot (Get-JarPath $entry.Key)))
     if (!(Test-Path -LiteralPath $jar)) { throw "Missing $jar. Start without -SkipBuild first." }
 }
 $logDir=Join-Path $projectRoot '.logs'
@@ -54,7 +61,7 @@ try {
     }
     foreach($entry in $modules.GetEnumerator()) {
         $name=$entry.Key
-        $jar=Join-Path $projectRoot (Get-JarPath $name)
+        $jar=[IO.Path]::GetFullPath((Join-Path $projectRoot (Get-JarPath $name)))
         $proc=Start-Process -FilePath $javaExe -ArgumentList @('-jar',('"'+$jar+'"'),"--spring.profiles.active=$activeProfiles","--server.port=$($entry.Value)","--server.address=127.0.0.1") -WorkingDirectory $projectRoot -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $logDir "$name.log") -RedirectStandardError (Join-Path $logDir "$name.err.log")
         $started+=@{id=$proc.Id;name=$name;jar=(Get-JarPath $name);started=$proc.StartTime.ToUniversalTime().ToString('o');startedTicks=$proc.StartTime.ToUniversalTime().Ticks.ToString()}
         $started | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $logDir 'processes.json') -Encoding UTF8
@@ -71,7 +78,7 @@ try {
         Start-Sleep -Milliseconds 500
     }
     if(!$ready){throw 'Services did not become healthy. Check the .logs folder.'}
-
+    if($SeedDemo -and $Profile -eq 'local'){& (Join-Path $PSScriptRoot 'seed-demo-menu.ps1')}
     Write-Host ''
     Write-Host 'ORDER & GO is ready: http://localhost:8080' -ForegroundColor Green
     Write-Host "Database: $Database"
@@ -85,5 +92,3 @@ try {
 } finally {
     foreach($name in $previousMysqlEnv.Keys){[Environment]::SetEnvironmentVariable($name,$previousMysqlEnv[$name],'Process')}
 }
-
-

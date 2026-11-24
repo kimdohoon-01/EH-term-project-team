@@ -9,7 +9,8 @@ public final class Contracts {
     private Contracts() {}
     public record UserView(String id, String email, String name) {}
     public record RegisterRequest(@NotBlank @Email @Size(max=120) String email,
-        @NotBlank @Size(min=8,max=72) String password, @NotBlank @Size(min=2,max=30) String name) {}
+        @NotBlank @Size(min=8,max=72) String password, @NotBlank @Size(min=2,max=30) String name,
+        @NotBlank @Size(min=5,max=200) String address, @Size(max=100) String addressDetail) {}
     public record LoginRequest(@NotBlank @Email String email, @NotBlank String password) {}
     public record AuthResponse(String accessToken, UserView user) {}
     public record MenuItem(String id, String name, String category, String description, int price, long stock) {}

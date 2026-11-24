@@ -4,7 +4,7 @@
 
 | 메서드·경로 | 내용 |
 |---|---|
-| POST /api/auth/register | email, password, name → accessToken, user |
+| POST /api/auth/register | email, password, name, address, addressDetail(선택) → accessToken, user |
 | POST /api/auth/login | email, password → accessToken, user |
 | GET /api/auth/me | 현재 회원 |
 | DELETE /api/auth/session | 로그아웃 |
@@ -74,3 +74,5 @@ CARD는 SUCCESS, TEST_DECLINE은 FAILURE로 변환합니다. SUCCEEDED는 내부
 POST `/internal/notifications`: eventId, userId, orderId, status(CONFIRMED/CANCELLED). 같은 eventId는 한 번 저장합니다. GET `/internal/notifications?userId=...`, PATCH `/internal/notifications/{id}/read?userId=...`는 오더가 인증한 회원 ID로 호출합니다.
 
 도훈 서비스의 `/internal/*`는 X-Internal-Key를 사용합니다. 규아 메뉴·페이먼트 API에는 이 인증이 없으며 내부 키를 전송하지 않습니다. 기본 로컬 실행은 모든 서비스를 127.0.0.1에 바인딩합니다.
+
+회원가입: address는 5~200자, addressDetail은 선택이며 최대 100자입니다. 비밀번호는 ASCII 영문·숫자·특수문자를 포함하고 공백 없는 8~72자입니다. 기존 회원 로그인에는 새 규칙을 소급 적용하지 않습니다. 주소는 user_addresses에 저장하고 주문·알림 응답에 포함하지 않습니다.

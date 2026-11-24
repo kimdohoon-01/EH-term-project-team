@@ -1,4 +1,4 @@
-param(
+﻿param(
     [ValidateSet('127.0.0.1','localhost')][string]$DbHost='127.0.0.1',
     [ValidateRange(1,65535)][int]$Port=3306,
     [string]$AdminUser='root',
@@ -58,13 +58,11 @@ try{
     if($process.ExitCode -ne 0){throw $safeError}
     $account=$result|ConvertFrom-Json
     $protectedPassword=ConvertTo-SecureString $account.password -AsPlainText -Force | ConvertFrom-SecureString
-    $config=@{schemaVersion=2;host=$DbHost;port=$Port;username=$account.username;protectedPassword=$protectedPassword}
+    $config=@{schemaVersion=3;host=$DbHost;port=$Port;username=$account.username;protectedPassword=$protectedPassword}
     if(Test-Path -LiteralPath $configPath){Copy-Item -LiteralPath $configPath -Destination ($configPath+'.backup-'+(Get-Date -Format yyyyMMddHHmmss))}; $config|ConvertTo-Json|Set-Content -LiteralPath $configPath -Encoding UTF8
     $account=$null;$result=$null
 }finally{if($process){$process.Dispose()}}
 Write-Host 'MySQL databases and tables are ready.' -ForegroundColor Green
-Write-Host 'Refresh HeidiSQL: orderandgo_user, orderandgo_order, orderandgo_notification.'
+Write-Host 'Refresh HeidiSQL: orderandgo_user, orderandgo_order, orderandgo_notification, cafe_menu, cafe_payment.'
 Write-Host 'The project account password is encrypted for this Windows user in .local/mysql.json.'
 if(!$NoStart){& (Join-Path $PSScriptRoot 'start-local.ps1') -SkipBuild -Database mysql}
-
-

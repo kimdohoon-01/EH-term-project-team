@@ -13,7 +13,7 @@ class SetupMysql {
             String url="jdbc:mysql://"+host+":"+port+"/?characterEncoding=UTF-8&connectionTimeZone=Asia/Seoul&connectTimeout=5000&socketTimeout=20000";
             Class.forName("com.mysql.cj.jdbc.Driver");
             String adminPassword=Objects.requireNonNullElse(System.getenv("ORDERANDGO_ADMIN_PASSWORD"),"");
-            var schemas=List.of("orderandgo_user","orderandgo_order","orderandgo_notification");
+            var schemas=List.of("orderandgo_user","orderandgo_order","orderandgo_notification","cafe_menu","cafe_payment");
             try(Connection db=DriverManager.getConnection(url,args[3],adminPassword);Statement statement=db.createStatement()) {
                 if(db.getMetaData().getDatabaseMajorVersion()<8) throw new IllegalArgumentException("MySQL 8 or newer is required");
                 String sql=Files.readString(root.resolve("docs/mysql-init.sql"),StandardCharsets.UTF_8).replaceAll("(?m)^--.*$","");
@@ -40,5 +40,3 @@ class SetupMysql {
         }
     }
 }
-
-

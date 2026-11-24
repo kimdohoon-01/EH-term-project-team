@@ -89,10 +89,20 @@ async function loadPrivate(){
 function openAuth(){if(!$('auth-dialog').open)$('auth-dialog').showModal();$('auth-error').textContent='';}
 function updateAccount(){$('account-button').textContent=state.user?state.user.name+'님 · 로그아웃':'로그인 / 회원가입';}
 function forgetLogin(){state.token=null;state.user=null;sessionStorage.removeItem('og-token');updateAccount();renderMenus();renderCart();loadPrivate();}
-function switchAuth(){state.register=!state.register;$('name-field').hidden=!state.register;$('auth-name').required=state.register;$('auth-password').minLength=state.register?8:1;$('auth-password').autocomplete=state.register?'new-password':'current-password';$('auth-title').textContent=state.register?'여유로운 하루의 시작':'다시 만나 반가워요';$('auth-subtitle').textContent=state.register?'오더앤고와 함께 첫 주문을 시작해 보세요.':'로그인하고 나만의 한 잔을 주문해 보세요.';$('auth-submit').textContent=state.register?'회원가입':'로그인';$('auth-switch-label').textContent=state.register?'이미 계정이 있나요?':'아직 계정이 없나요?';$('switch-auth').textContent=state.register?'로그인':'회원가입';$('auth-error').textContent='';}
+function switchAuth(){state.register=!state.register;
+  for(const id of ['address-field','address-detail-field','confirm-field','password-help'])$(id).hidden=!state.register;
+  $('auth-address').required=state.register;$('auth-password-confirm').required=state.register;
+  $('auth-address').disabled=!state.register;$('auth-address-detail').disabled=!state.register;$('auth-password-confirm').disabled=!state.register;
+  $('auth-password-confirm').value='';
+  $('name-field').hidden=!state.register;$('auth-name').required=state.register;$('auth-password').minLength=state.register?8:1;$('auth-password').autocomplete=state.register?'new-password':'current-password';$('auth-title').textContent=state.register?'여유로운 하루의 시작':'다시 만나 반가워요';$('auth-subtitle').textContent=state.register?'오더앤고와 함께 첫 주문을 시작해 보세요.':'로그인하고 나만의 한 잔을 주문해 보세요.';$('auth-submit').textContent=state.register?'회원가입':'로그인';$('auth-switch-label').textContent=state.register?'이미 계정이 있나요?':'아직 계정이 없나요?';$('switch-auth').textContent=state.register?'로그인':'회원가입';$('auth-error').textContent='';}
 $('auth-form').addEventListener('submit',async event=>{
   event.preventDefault();$('auth-submit').disabled=true;$('auth-error').textContent='';
-  try{const body={email:$('auth-email').value.trim(),password:$('auth-password').value};if(state.register)body.name=$('auth-name').value.trim();const result=await api('/auth/'+(state.register?'register':'login'),{method:'POST',body:JSON.stringify(body)});state.token=result.accessToken;state.user=result.user;sessionStorage.setItem('og-token',state.token);$('auth-dialog').close();$('auth-password').value='';updateAccount();renderMenus();renderCart();await loadPrivate();toast(state.user.name+'님, 반가워요!');}
+  try{const body={email:$('auth-email').value.trim(),password:$('auth-password').value};if(state.register){
+      if(!/^[!-~]{8,72}$/.test(body.password)||!/[A-Za-z]/.test(body.password)||!/[0-9]/.test(body.password)||!/[^A-Za-z0-9]/.test(body.password))throw new Error('비밀번호는 공백 없이 영문·숫자·특수문자를 포함한 8~72자로 입력해 주세요.');
+      if(body.password!==$('auth-password-confirm').value)throw new Error('비밀번호 확인이 일치하지 않습니다.');
+      body.name=$('auth-name').value.trim();body.address=$('auth-address').value.trim();body.addressDetail=$('auth-address-detail').value.trim();
+      if(body.address.length<5)throw new Error('기본주소를 5자 이상 입력해 주세요.');
+    }const result=await api('/auth/'+(state.register?'register':'login'),{method:'POST',body:JSON.stringify(body)});state.token=result.accessToken;state.user=result.user;sessionStorage.setItem('og-token',state.token);$('auth-dialog').close();$('auth-password').value='';$('auth-password-confirm').value='';$('auth-address').value='';$('auth-address-detail').value='';updateAccount();renderMenus();renderCart();await loadPrivate();toast(state.user.name+'님, 반가워요!');}
   catch(error){$('auth-error').textContent=error.message;}finally{$('auth-submit').disabled=false;}
 });
 $('account-button').addEventListener('click',async()=>{if(!state.user){openAuth();return;}try{await api('/auth/session',{method:'DELETE'});forgetLogin();toast('로그아웃했어요.');}catch(e){toast(e.message);}});

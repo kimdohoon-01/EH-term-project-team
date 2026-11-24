@@ -6,3 +6,9 @@ CREATE TABLE IF NOT EXISTS sessions (
  token_hash VARCHAR(64) PRIMARY KEY, user_id VARCHAR(36) NOT NULL REFERENCES app_users(id),
  expires_at BIGINT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS user_addresses (
+ user_id VARCHAR(36) PRIMARY KEY, address VARCHAR(200) NOT NULL,
+ address_detail VARCHAR(100) NOT NULL DEFAULT '',
+ FOREIGN KEY (user_id) REFERENCES app_users(id)
+);

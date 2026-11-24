@@ -83,4 +83,3 @@ class OrderServiceTest {
         verify(remote,times(2)).reserve(new ReserveRequest(order.id(),request.items()));
     }
 }
-

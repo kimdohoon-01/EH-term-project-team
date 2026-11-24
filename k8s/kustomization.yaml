@@ -1,0 +1,10 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: cafe-pickup
+resources:
+  - namespace.yaml
+  - menu-db.yaml
+  - payment-db.yaml
+  - menu-service.yaml
+  - payment-service.yaml
+  - cafe-gateway.yaml
