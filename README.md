@@ -1,3 +1,15 @@
+# 오더앤고 팀 프로젝트
+
+Windows에서 메뉴·결제와 유저·오더·알림을 함께 실행하려면 팀 저장소 루트에서 다음 명령을 실행합니다.
+
+```powershell
+.\order-and-go\start-local.cmd -SeedDemo
+```
+
+주문 화면은 [8080](http://localhost:8080), 메뉴·재고 관리는 [8082](http://localhost:8082)에서 열립니다. [통합 실행 및 MySQL 설정](order-and-go/README.md)을 참고하세요.
+
+---
+
 # 카페 포장 미리 주문 · 메뉴와 페이먼트
 
 규아 담당인 메뉴 서비스와 페이먼트 서비스를 Java 17과 Spring Boot로 구현한다. 메뉴는 HTML 관리 화면과 API를 제공하고 페이먼트는 결제 API를 제공한다. 쿠버네티스에서는 서비스별 MySQL DB와 PVC를 사용한다. 로컬 Java 실행은 서비스별 H2 파일 DB를 사용한다.

@@ -20,4 +20,12 @@
         <module>menu-service</module>
         <module>payment-service</module>
     </modules>
+    <profiles>
+        <profile>
+            <id>integration</id>
+            <modules>
+                <module>order-and-go</module>
+            </modules>
+        </profile>
+    </profiles>
 </project>

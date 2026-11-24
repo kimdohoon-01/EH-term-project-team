@@ -1,0 +1,11 @@
+**/target/
+.data/
+.logs/
+.maven/
+.idea/
+*.iml
+.env
+*.log
+
+.local/
+**/data/

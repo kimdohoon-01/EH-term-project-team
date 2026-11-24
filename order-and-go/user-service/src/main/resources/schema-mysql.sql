@@ -1,0 +1,14 @@
+CREATE TABLE IF NOT EXISTS app_users (
+ id VARCHAR(36) PRIMARY KEY, email VARCHAR(120) UNIQUE NOT NULL,
+ name VARCHAR(30) NOT NULL, password_hash VARCHAR(100) NOT NULL
+) ENGINE=InnoDB;
+CREATE TABLE IF NOT EXISTS sessions (
+ token_hash VARCHAR(64) PRIMARY KEY, user_id VARCHAR(36) NOT NULL,
+ expires_at BIGINT NOT NULL, FOREIGN KEY (user_id) REFERENCES app_users(id)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS user_addresses (
+ user_id VARCHAR(36) PRIMARY KEY, address VARCHAR(200) NOT NULL,
+ address_detail VARCHAR(100) NOT NULL DEFAULT '',
+ FOREIGN KEY (user_id) REFERENCES app_users(id)
+);
