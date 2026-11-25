@@ -8,7 +8,7 @@ const action = (text,cls,fn) => {const b=node('button',cls,text);b.type='button'
 let toastTimer;
 function toast(text){$('toast').textContent=text;$('toast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').hidden=true,4000);}
 async function api(path,options={}) {
-  const response=await fetch('/api'+path,{...options,headers:{'Content-Type':'application/json',...(state.token?{Authorization:'Bearer '+state.token}:{}),...options.headers}});
+  const response=await fetch('/shop/api'+path,{cache:'no-store',...options,headers:{'Content-Type':'application/json',...(state.token?{Authorization:'Bearer '+state.token}:{}),...options.headers}});
   const body=await response.json().catch(()=>({message:'응답을 읽을 수 없습니다.'}));
   if(!response.ok){const error=new Error(body.message||'요청을 처리할 수 없습니다.');error.status=response.status;throw error;}
   return body;
@@ -19,7 +19,35 @@ function art(menu){
   box.innerHTML=menu.category==='DESSERT'?'<svg viewBox="0 0 120 120" aria-hidden="true"><ellipse cx="61" cy="99" rx="37" ry="6" fill="#6d4b2c" opacity=".1"/><circle cx="60" cy="60" r="38" fill="currentColor"/><circle cx="57" cy="57" r="33" fill="#d1a775"/><g fill="#634b39"><rect x="40" y="38" width="10" height="9" rx="2" transform="rotate(20 45 42)"/><rect x="64" y="30" width="8" height="10" rx="2" transform="rotate(-17 68 35)"/><rect x="69" y="54" width="11" height="8" rx="2"/><rect x="41" y="64" width="9" height="10" rx="2" transform="rotate(-20 45 70)"/><rect x="62" y="79" width="9" height="8" rx="2"/></g></svg>':'<svg viewBox="0 0 120 120" aria-hidden="true"><ellipse cx="60" cy="106" rx="29" ry="5" fill="#655944" opacity=".1"/><path d="M31 26h58l-7 72q-22 10-44 0z" fill="currentColor"/><path d="M34 41h52l-4 44H38z" fill="#f6f1e1" opacity=".9"/><path d="M29 24h62v9H29z" fill="#f8f6ec"/><ellipse cx="60" cy="23" rx="32" ry="6" fill="#e4e0d0"/><ellipse cx="60" cy="22" rx="25" ry="3" fill="#6a5140"/><path d="M66 22l8-18" stroke="#b1b898" stroke-width="4"/><circle cx="60" cy="64" r="13" fill="#375640"/><text x="59" y="70" font-family="Georgia,serif" font-size="19" text-anchor="middle" fill="#f1efd4">o.</text></svg>';
   box.append(node('span','stock-tag',menu.stock>0?'남은 수량 '+menu.stock:'SOLD OUT'));return box;
 }
-async function loadMenus(){state.menus=await api('/menus');renderMenus();renderCart();}
+let menuRequest = 0;
+let menuSnapshot = null;
+async function loadMenus() {
+    const request = ++menuRequest;
+    const menus = await api('/menus');
+    if (request !== menuRequest) return;
+
+    let removed = false;
+    if (!pending()) {
+        const available = new Set(menus.map(menu => menu.id));
+        for (const id of state.cart.keys()) {
+            if (!available.has(id)) {
+                state.cart.delete(id);
+                removed = true;
+            }
+        }
+    }
+
+    const snapshot = JSON.stringify(menus);
+    if (snapshot !== menuSnapshot) {
+        menuSnapshot = snapshot;
+        state.menus = menus;
+        renderMenus();
+        renderCart();
+    } else if (removed) {
+        renderCart();
+    }
+    if (removed) toast('판매가 종료된 메뉴를 장바구니에서 뺐어요.');
+}
 function locked(){return state.busy||Boolean(pending());}
 function renderMenus(){
   const root=$('menu-list');root.replaceChildren();
@@ -110,10 +138,23 @@ $('close-auth').addEventListener('click',()=>$('auth-dialog').close());$('switch
 document.querySelectorAll('[data-tab]').forEach(b=>b.addEventListener('click',()=>showTab(b.dataset.tab)));
 document.querySelectorAll('[data-category]').forEach(b=>b.addEventListener('click',()=>{state.category=b.dataset.category;document.querySelectorAll('[data-category]').forEach(c=>c.classList.toggle('active',c===b));renderMenus();}));
 document.querySelectorAll('.refresh').forEach(b=>b.addEventListener('click',()=>loadPrivate().catch(e=>toast(e.message))));
+function refreshVisibleMenus() {
+    if (!document.hidden && !state.busy) loadMenus().catch(() => {});
+}
+document.addEventListener('visibilitychange', refreshVisibleMenus);
+const menuEvents = typeof EventSource === 'function' ? new EventSource('/api/menus/events') : null;
+function refreshFromMenuEvent() {
+    if (!state.busy) loadMenus().catch(() => {});
+}
+menuEvents?.addEventListener('open', refreshFromMenuEvent);
+menuEvents?.addEventListener('menu-changed', refreshFromMenuEvent);
 async function init(){
   try{const config=await api('/config');state.testPayments=config.testPayments;$('test-panel').hidden=!config.testPayments;}catch{}
   if(state.token){try{state.user=await api('/auth/me');}catch(e){if(e.status===401)forgetLogin();else toast(e.message);}}
   updateAccount();try{await loadMenus();}catch(e){$('menu-list').replaceChildren(node('p','empty',e.message));}renderCart();await loadPrivate();
-  setInterval(()=>{if(!document.hidden&&state.user)loadPrivate().catch(()=>{});},5000);
+  setInterval(()=>{
+    if (!menuEvents || menuEvents.readyState !== EventSource.OPEN) refreshVisibleMenus();
+    if(!document.hidden&&state.user)loadPrivate().catch(()=>{});
+  },5000);
 }
 init().catch(e=>toast(e.message));

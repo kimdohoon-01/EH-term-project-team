@@ -64,7 +64,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\smoke-test.ps1
 
 규아 서비스가 별도로 실행 중이면 `-Profile team`으로 도훈의 세 서비스만 실행합니다. 이때 MENU_SERVICE_URL / PAYMENT_SERVICE_URL로 주소를 지정할 수 있으며 테스트 결제 선택은 비활성화됩니다. 기본값은 127.0.0.1:8082 / 8084입니다.
 
-로컬 수업 시연용이며 주문 서비스 한 인스턴스를 전제로 합니다. 메뉴·페이먼트의 관리 API에는 인증이 없으므로 기본 실행은 이 PC의 127.0.0.1에 바인딩합니다. 사용자 취소·환불·실제 PG·SMS·푸시·전체 Kubernetes 배포는 포함하지 않습니다. 규아 폴더의 Kubernetes 구성은 규아의 두 서비스용 기존 구성입니다.
+로컬 수업 시연용이며 주문 서비스 한 인스턴스를 전제로 합니다. 메뉴·페이먼트의 관리 API에는 인증이 없으므로 Windows 기본 실행은 이 PC의 127.0.0.1에 바인딩합니다. 사용자 취소·환불·실제 PG·SMS·푸시는 구현 범위 밖입니다. 다섯 서비스의 Docker·쿠버네티스 배포는 [팀 저장소 README](../README.md#docker-이미지와-쿠버네티스-배포)를 참고하세요.
 
 Git에는 소스만 공유하세요. `.data`, `.local`, `.logs`, `.maven`, `data`, 모든 `target`은 제외합니다.
 

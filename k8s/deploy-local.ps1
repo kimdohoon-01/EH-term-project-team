@@ -12,35 +12,43 @@ function Invoke-Kubectl {
 Invoke-Kubectl --request-timeout=10s get nodes
 Invoke-Kubectl apply -f (Join-Path $PSScriptRoot 'namespace.yaml')
 
-foreach ($database in @('menu-db', 'payment-db')) {
-    $secret = "$database-credentials"
-    $existing = Invoke-Kubectl -n $projectNamespace get secret $secret --ignore-not-found -o name
+function Initialize-Secret([string]$name, [hashtable]$values) {
+    $existing = Invoke-Kubectl -n $projectNamespace get secret $name --ignore-not-found -o name
     if (-not $existing) {
-        $password = [guid]::NewGuid().ToString('N')
-        $rootPassword = [guid]::NewGuid().ToString('N')
         $secretManifest = @{
             apiVersion = 'v1'
             kind = 'Secret'
-            metadata = @{ name = $secret }
-            stringData = @{ password = $password; 'root-password' = $rootPassword }
+            metadata = @{ name = $name }
+            stringData = $values
         } | ConvertTo-Json -Depth 4 -Compress
         $secretManifest | & kubectl --context $cluster -n $projectNamespace create -f -
         if ($LASTEXITCODE -ne 0) {
-            throw "$database DB Secret을 만들지 못했습니다."
+            throw "$name Secret을 만들지 못했습니다."
         }
     }
 }
 
-Invoke-Kubectl -n $projectNamespace apply -f (Join-Path $PSScriptRoot 'menu-db.yaml') -f (Join-Path $PSScriptRoot 'payment-db.yaml')
-foreach ($deployment in @('menu-db', 'payment-db')) {
+$databases = @('menu-db', 'payment-db', 'user-db', 'order-db', 'notification-db')
+$apps = @('menu-service', 'payment-service', 'user-service', 'notification-service', 'order-service', 'cafe-gateway')
+
+foreach ($database in $databases) {
+    Initialize-Secret "$database-credentials" @{
+        password = [guid]::NewGuid().ToString('N')
+        'root-password' = [guid]::NewGuid().ToString('N')
+    }
+}
+Initialize-Secret 'orderandgo-internal' @{ 'api-key' = [guid]::NewGuid().ToString('N') }
+
+foreach ($database in $databases) {
+    Invoke-Kubectl -n $projectNamespace apply -f (Join-Path $PSScriptRoot "$database.yaml")
+}
+foreach ($deployment in $databases) {
     Invoke-Kubectl -n $projectNamespace rollout status "deployment/$deployment" --timeout=180s
 }
 
-Invoke-Kubectl -n $projectNamespace apply -f (Join-Path $PSScriptRoot 'menu-service.yaml') -f (Join-Path $PSScriptRoot 'payment-service.yaml')
-foreach ($deployment in @('menu-service', 'payment-service')) {
+Invoke-Kubectl apply -k $PSScriptRoot
+foreach ($deployment in $apps) {
     Invoke-Kubectl -n $projectNamespace rollout status "deployment/$deployment" --timeout=180s
 }
-Invoke-Kubectl -n $projectNamespace apply -f (Join-Path $PSScriptRoot 'cafe-gateway.yaml')
-Invoke-Kubectl -n $projectNamespace rollout status deployment/cafe-gateway --timeout=180s
 Invoke-Kubectl -n $projectNamespace wait '--for=jsonpath={.status.loadBalancer.ingress}' service/cafe-gateway --timeout=120s
 Invoke-Kubectl -n $projectNamespace get 'pods,services,pvc'

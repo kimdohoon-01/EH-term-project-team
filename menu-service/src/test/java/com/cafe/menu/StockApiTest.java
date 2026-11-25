@@ -56,6 +56,29 @@ class StockApiTest {
     }
 
     @Test
+    void removingMenuHidesItButKeepsExistingReservations() throws Exception {
+        long menuId = createMenu(5);
+        String menu = "/api/menus/" + menuId;
+        String reservation = "/api/stock/reservations/removed-menu";
+        mvc.perform(put(reservation).contentType(MediaType.APPLICATION_JSON).content(items(menuId, 2)))
+                .andExpect(status().isOk());
+
+        mvc.perform(delete(menu)).andExpect(status().isNoContent());
+        mvc.perform(delete(menu)).andExpect(status().isNoContent());
+        mvc.perform(get("/api/menus"))
+                .andExpect(jsonPath("$[?(@.id == " + menuId + ")]").isEmpty());
+        mvc.perform(get("/api/menus").param("includeInactive", "true"))
+                .andExpect(jsonPath("$[?(@.id == " + menuId + " && @.active == false)]").isNotEmpty());
+        mvc.perform(put("/api/stock/reservations/after-removal").contentType(MediaType.APPLICATION_JSON)
+                        .content(items(menuId, 1)))
+                .andExpect(status().isConflict());
+        mvc.perform(post(reservation + "/release")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("RELEASED"));
+        expectStock(menuId, 5);
+        mvc.perform(delete("/api/menus/9223372036854775807")).andExpect(status().isNotFound());
+    }
+
+    @Test
     void menuManagementAndStockValidation() throws Exception {
         long menuId = createMenu(2);
         String menu = "/api/menus/" + menuId;

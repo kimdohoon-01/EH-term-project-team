@@ -14,7 +14,7 @@ async function api(path, method = "GET", data) {
         body: data ? JSON.stringify(data) : undefined,
         cache: "no-store"
     });
-    const result = await response.json();
+    const result = response.status === 204 ? null : await response.json();
     if (!response.ok) {
         throw new Error(result.detail || result.title || "요청을 처리할 수 없습니다.");
     }
@@ -50,8 +50,11 @@ const menuForm = document.querySelector("#menu-form");
 const adjustForm = document.querySelector("#adjust-form");
 const stockForm = document.querySelector("#stock-form");
 const menus = document.querySelector("#menus");
+const includeInactive = document.querySelector("#include-inactive");
 const reservation = document.querySelector("#reservation");
 let editingId = null;
+let menuListRequest = 0;
+let menuListSnapshot = null;
 
 function editMenu(menu) {
     editingId = menu?.id ?? null;
@@ -70,7 +73,12 @@ function editMenu(menu) {
 }
 
 async function refreshMenus() {
-    const items = await api("/api/menus?includeInactive=true");
+    const request = ++menuListRequest;
+    const items = await api("/api/menus?includeInactive=" + includeInactive.checked);
+    if (request !== menuListRequest) return;
+    const snapshot = JSON.stringify(items);
+    if (snapshot === menuListSnapshot) return;
+    menuListSnapshot = snapshot;
     const rows = items.map(menu => {
         const row = rowWith([menu.id, menu.name, won.format(menu.price) + "원", menu.stock,
             menu.active ? "판매 중" : "판매 중지"]);
@@ -82,11 +90,31 @@ async function refreshMenus() {
             editMenu(menu);
             menuForm.elements.name.focus();
         });
-        row.insertCell().append(edit);
+        const actions = row.insertCell();
+        actions.append(edit);
+        if (menu.active) {
+            const remove = document.createElement("button");
+            remove.type = "button";
+            remove.className = "menu-remove";
+            remove.textContent = "삭제";
+            remove.setAttribute("aria-label", menu.name + " 삭제");
+            remove.addEventListener("click", () => {
+                if (!window.confirm(menu.name + "을(를) 주문 화면에서 내릴까요?")) return;
+                run(remove, async () => {
+                    await api("/api/menus/" + menu.id, "DELETE");
+                    if (editingId === menu.id) editMenu();
+                    await refreshMenus();
+                    report("메뉴를 삭제했습니다.");
+                });
+            });
+            actions.append(remove);
+        }
         return row;
     });
     menus.replaceChildren(...(rows.length ? rows : [emptyRow("등록된 메뉴가 없습니다.", 6)]));
 }
+
+includeInactive.addEventListener("change", () => refreshMenus().catch(error => report(error.message, true)));
 
 document.querySelector("#new-menu").addEventListener("click", () => {
     editMenu();
@@ -147,3 +175,11 @@ stockForm.addEventListener("submit", event => {
 });
 
 refreshMenus().catch(error => report(error.message, true));
+
+const menuEvents = typeof EventSource === "function" ? new EventSource("/api/menus/events") : null;
+const refreshFromNotification = () => refreshMenus().catch(() => {});
+menuEvents?.addEventListener("open", refreshFromNotification);
+menuEvents?.addEventListener("menu-changed", refreshFromNotification);
+setInterval(() => {
+    if (!document.hidden && (!menuEvents || menuEvents.readyState !== EventSource.OPEN)) refreshFromNotification();
+}, 5000);

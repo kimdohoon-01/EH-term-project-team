@@ -15,15 +15,19 @@ import java.util.List;
 class StockController {
     private static final String ORDER_ID = "[a-z0-9_-]{1,64}";
     private final StockService stock;
+    private final MenuUpdates menuUpdates;
 
-    StockController(StockService stock) {
+    StockController(StockService stock, MenuUpdates menuUpdates) {
         this.stock = stock;
+        this.menuUpdates = menuUpdates;
     }
 
     @PutMapping("/{orderId}")
     StockService.Reservation reserve(@PathVariable @Pattern(regexp = ORDER_ID) String orderId,
                                      @Valid @RequestBody ReserveStock request) {
-        return stock.reserve(orderId, request.items());
+        var reservation = stock.reserve(orderId, request.items());
+        menuUpdates.menuChanged();
+        return reservation;
     }
 
     @GetMapping("/{orderId}")
@@ -33,7 +37,9 @@ class StockController {
 
     @PostMapping("/{orderId}/release")
     StockService.Reservation release(@PathVariable @Pattern(regexp = ORDER_ID) String orderId) {
-        return stock.release(orderId);
+        var reservation = stock.release(orderId);
+        menuUpdates.menuChanged();
+        return reservation;
     }
 
     record ReserveStock(@NotEmpty @Size(max = 50) List<@NotNull @Valid Line> items) {}

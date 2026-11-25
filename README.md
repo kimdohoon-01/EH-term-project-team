@@ -1,6 +1,6 @@
 # 오더앤고 팀 프로젝트
 
-Windows에서 메뉴·결제와 유저·오더·알림을 함께 실행하려면 팀 저장소 루트에서 다음 명령을 실행합니다.
+Windows에서 다섯 서비스를 Java 프로세스로 실행하려면 팀 저장소 루트에서 다음 명령을 실행합니다. Windows 실행과 쿠버네티스 게이트웨이는 같은 PC의 8080을 사용합니다. 쿠버네티스 게이트웨이가 켜져 있으면 아래 쿠버네티스 접속 주소를 사용합니다.
 
 ```powershell
 .\order-and-go\start-local.cmd -SeedDemo
@@ -43,34 +43,52 @@ Docker Desktop의 Linux 엔진과 `docker-desktop` 쿠버네티스 클러스터�
 ```powershell
 docker build -f menu-service/Dockerfile -t menu-service:local .
 docker build -f payment-service/Dockerfile -t payment-service:local .
+foreach ($service in 'user-service', 'order-service', 'notification-service') {
+    docker build -f order-and-go/Dockerfile --target $service -t "$($service):local" .
+}
 .\k8s\deploy-local.ps1
 ```
 
-배포 스크립트가 `cafe-pickup` 네임스페이스와 DB별 Secret을 만들고, MySQL, 앱, 웹 게이트웨이를 순서대로 배포한다. 기존 DB Secret은 재사용한다. PVC는 클러스터의 기본 StorageClass로 PV를 할당받는다.
+배포 스크립트가 `cafe-pickup` 네임스페이스를 준비하고, MySQL 다섯 개와 서비스 다섯 개, 웹 게이트웨이를 배포한다. 서비스마다 내부 MySQL 3306과 PVC를 사용한다. 기존 메뉴·결제 DB의 Secret과 PVC를 재사용한다. 유저·오더·알림은 기존 MySQL 스키마 파일로 테이블을 초기화한다. Windows의 MySQL 3306을 쓰는 로컬 실행과 쿠버네티스는 별도 DB에 저장한다.
 
-Docker Desktop에서 배포가 끝나면 `LoadBalancer` 게이트웨이가 PC의 8080에서 요청을 받는다. 메뉴와 결제 API는 아래 주소로 바로 접속한다.
+Docker Desktop에서 배포가 끝나면 `LoadBalancer` 게이트웨이가 PC의 8080에서 요청을 받는다.
 
-[메뉴와 재고 화면](http://localhost:8080/menu/) · [결제 기록 API](http://localhost:8080/api/payments)
+[고객 주문 화면](http://localhost:8080/) · [메뉴와 재고 관리](http://localhost:8080/menu/) · [결제 기록 API](http://localhost:8080/api/payments)
+
+메뉴가 비어 있으면 메뉴 관리 화면에서 등록한다. 고객 주문 화면에서 회원가입·로그인 후 정상 주문을 넣고 확정 알림을 확인한다. 장바구니의 발표용 결제 시연으로 실패 주문을 넣으면 재고가 복구된 뒤 주문 취소와 알림이 표시된다. 이 배포에는 모의 결제만 사용한다.
+
+메뉴 관리에서 **새 메뉴**로 등록하거나 **삭제**로 판매를 중지할 수 있다. 쿠버네티스 게이트웨이에서는 열린 고객·관리 화면이 서버의 변경 알림을 받아 자동으로 갱신된다. 알림 연결이 끊기면 열린 화면에서 5초마다 목록을 확인한다. 판매 중지한 메뉴는 **판매 중지 메뉴도 보기**에서 조회하고 수정해 다시 판매할 수 있다. 기존 주문과 재고 기록은 DB에 보존된다.
 
 같은 네트워크에 있는 팀원은 배포한 PC의 IPv4 주소와 8080 포트를 사용한다. Windows 방화벽에서 해당 네트워크의 TCP 8080 연결이 허용되어 있어야 한다. 별도 클러스터에서 배포하는 경우 해당 클러스터의 로드밸런서가 할당한 외부 주소를 사용한다.
 
-실습과 같은 NodePort 접속에는 `cafe-gateway-nodeport` 서비스를 사용한다. 이 Docker Desktop 환경에서는 [노드 포트 메뉴 화면](http://localhost:30080/menu/)을 열 수 있다. 쿠버네티스 노드 주소에 직접 접속할 수 있는 환경에서는 `http://<노드 IP>:30080/menu/`를 사용한다. 노드 포트 30080과 PC의 8080은 같은 게이트웨이 Pod의 8080으로 연결된다.
+실습과 같은 NodePort 접속에는 `cafe-gateway-nodeport` 서비스를 사용한다. 이 Docker Desktop 환경에서는 [노드 포트 주문 화면](http://localhost:30080/)을 열 수 있다. 쿠버네티스 노드 주소에 직접 접속할 수 있는 환경에서는 `http://<노드 IP>:30080/`를 사용한다. 노드 포트 30080과 PC의 8080은 같은 게이트웨이 Pod의 8080으로 연결된다.
 
 같은 태그로 이미지를 다시 빌드했으면 앱을 다시 띄운다.
 
 ```powershell
-kubectl --context docker-desktop -n cafe-pickup rollout restart deployment/menu-service deployment/payment-service
+kubectl --context docker-desktop -n cafe-pickup rollout restart deployment/menu-service deployment/payment-service deployment/user-service deployment/order-service deployment/notification-service
 ```
 
 ## HeidiSQL에서 DB 확인
 
-이 PC의 HeidiSQL에는 `Cafe Pickup - Menu`(`127.0.0.1:13306`, `cafe_menu`)와 `Cafe Pickup - Payment`(`127.0.0.1:13307`, `cafe_payment`) 세션을 등록했다. 두 세션은 각 MySQL의 3306에 연결된다.
+이 PC의 HeidiSQL에는 아래 다섯 세션을 등록했다. 각 로컬 포트는 해당 쿠버네티스 MySQL의 3306에 연결된다.
+
+| HeidiSQL 세션 | 로컬 포트 | DB |
+| --- | --- | --- |
+| Cafe Pickup - Menu | 13306 | `cafe_menu` |
+| Cafe Pickup - Payment | 13307 | `cafe_payment` |
+| Cafe Pickup - User | 13308 | `orderandgo_user` |
+| Cafe Pickup - Order | 13309 | `orderandgo_order` |
+| Cafe Pickup - Notification | 13310 | `orderandgo_notification` |
 
 Docker Desktop을 재시작해 연결이 끊겼다면, 아래 명령을 각기 다른 PowerShell 창에서 실행한 다음 HeidiSQL에서 저장한 세션을 다시 연다.
 
 ```powershell
 kubectl --context docker-desktop -n cafe-pickup port-forward --address 127.0.0.1 svc/menu-db 13306:3306
 kubectl --context docker-desktop -n cafe-pickup port-forward --address 127.0.0.1 svc/payment-db 13307:3306
+kubectl --context docker-desktop -n cafe-pickup port-forward --address 127.0.0.1 svc/user-db 13308:3306
+kubectl --context docker-desktop -n cafe-pickup port-forward --address 127.0.0.1 svc/order-db 13309:3306
+kubectl --context docker-desktop -n cafe-pickup port-forward --address 127.0.0.1 svc/notification-db 13310:3306
 ```
 
 ## 오더 서비스 연동

@@ -7,11 +7,13 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
 
@@ -23,9 +25,16 @@ class MenuController {
             row.getLong("stock"), row.getBoolean("active"));
 
     private final JdbcClient db;
+    private final MenuUpdates menuUpdates;
 
-    MenuController(JdbcClient db) {
+    MenuController(JdbcClient db, MenuUpdates menuUpdates) {
         this.db = db;
+        this.menuUpdates = menuUpdates;
+    }
+
+    @GetMapping(path = "/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    SseEmitter events() {
+        return menuUpdates.subscribe();
     }
 
     @GetMapping
@@ -51,6 +60,7 @@ class MenuController {
         db.sql("INSERT INTO menu_items (name, price, stock, active) VALUES (:name, :price, :stock, TRUE)")
                 .param("name", request.name().strip()).param("price", request.price())
                 .param("stock", request.stock()).update(key, "id");
+        menuUpdates.menuChanged();
         return find(key.getKey().longValue());
     }
 
@@ -59,7 +69,20 @@ class MenuController {
         db.sql("UPDATE menu_items SET name = :name, price = :price, active = :active WHERE id = :id")
                 .param("name", request.name().strip()).param("price", request.price())
                 .param("active", request.active()).param("id", id).update();
-        return find(id);
+        MenuItem item = find(id);
+        menuUpdates.menuChanged();
+        return item;
+    }
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void removeFromSale(@PathVariable long id) {
+        int updated = db.sql("UPDATE menu_items SET active = FALSE WHERE id = :id")
+                .param("id", id).update();
+        if (updated == 0) {
+            find(id);
+        }
+        menuUpdates.menuChanged();
     }
 
     @PostMapping("/{id}/stock-adjustments")
@@ -72,6 +95,7 @@ class MenuController {
         if (updated == 0 && request.delta() != 0) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "조정할 재고가 부족합니다.");
         }
+        menuUpdates.menuChanged();
         return item;
     }
 

@@ -5,6 +5,16 @@ resources:
   - namespace.yaml
   - menu-db.yaml
   - payment-db.yaml
+  - user-db.yaml
+  - order-db.yaml
+  - notification-db.yaml
   - menu-service.yaml
   - payment-service.yaml
+  - user-service.yaml
+  - order-service.yaml
+  - notification-service.yaml
   - cafe-gateway.yaml
+configMapGenerator:
+  - name: cafe-gateway
+    files:
+      - default.conf=gateway.conf

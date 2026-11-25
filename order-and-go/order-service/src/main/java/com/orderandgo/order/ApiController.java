@@ -8,7 +8,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api")
+@RequestMapping({"/api", "/shop/api"})
 public class ApiController {
     private final RemoteServices remote;
     private final OrderService orders;
